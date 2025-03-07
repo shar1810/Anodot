@@ -1,0 +1,372 @@
+
+AWSTemplateFormatVersion: '2010-09-09'
+Outputs:
+  AnodotRoleArn:
+    Description: Anodot Role ARN
+    Value: !GetAtt 'AnodotRole.Arn'
+Parameters:
+  ExternalId:
+    Description: Insert the External ID you got from Anodot
+    Type: String
+
+  CostAndUsageReport:
+    Type: String
+    Default: 'true'
+    Description: 'Deploy CUR'
+    AllowedValues:
+    - 'true'
+    - 'false'
+
+  CURbucket:
+    Type: String
+    Default: 'true'
+    Description: 'Deploy S3 Bucket for CUR'
+    AllowedValues:
+    - 'true'
+    - 'false'
+
+  CURbucketName:
+    Type: String
+    Default: "empty"
+    Description: 'Name of the S3 bucket for CUR'
+
+Conditions:
+
+  CondBucket:  !Equals
+    - !Ref 'CURbucket'
+    - true
+
+  CondCUR:  !Equals
+    - !Ref 'CostAndUsageReport'
+    - true
+Resources:
+  S3AnodotBucket:
+    Type: AWS::S3::Bucket
+    Condition: CondBucket
+    DeletionPolicy: Retain
+    Properties:
+      BucketName: !Ref 'CURbucketName'
+      NotificationConfiguration:
+        TopicConfigurations:
+          - Topic: 'arn:aws:sns:us-east-1:932213950603:prod-new-invoice-upload'
+            Event: 's3:ObjectCreated:*'
+  S3AnodotBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Condition: CondBucket
+    DependsOn: S3AnodotBucket
+    Properties:
+      Bucket: !Ref 'CURbucketName'
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+        - 
+          Sid: 'Stmt1335892150622dd'
+          Action:
+            - "s3:GetBucketAcl"
+            - "s3:GetBucketPolicy"
+          Effect: "Allow"
+          Resource: !Sub "${S3AnodotBucket.Arn}"
+          Principal:
+            Service: "billingreports.amazonaws.com"
+        - 
+          Sid: "Stmt133589dffsdf0622dd"
+          Action: 
+            - "s3:PutObject"
+          Effect: "Allow"
+          Resource: !Sub "${S3AnodotBucket.Arn}/*"
+          Principal:
+            Service: "billingreports.amazonaws.com"
+
+  AnodotManagedPolicy:
+    Properties:
+      Description: Anodot Account Policy
+      PolicyDocument:
+        Statement:
+          - Effect: Allow
+            Action:
+              - s3:ListBucket
+              - s3:Get*
+            Resource:
+            - !Sub "${S3AnodotBucket.Arn}/*"
+            - !Sub "${S3AnodotBucket.Arn}"
+          - Effect: Allow
+            Action:
+              - s3:Put*
+            Resource:
+              - arn:aws:s3:::prod-invoice-update/*
+              - arn:aws:s3:::prod-invoice-update
+          - Effect: Allow
+            Action:
+              - ec2:Describe*
+            Resource: "*"
+          - Effect: Allow
+            Action:
+              - organizations:ListAccounts
+            Resource: "*"
+          - Effect: Allow
+            Action:
+              - elasticloadbalancing:Describe*
+            Resource: "*"
+          - Effect: Allow
+            Action:
+              - s3:ListBucket
+              - s3:GetBucketLocation
+              - s3:ListBucketVersions
+              - s3:GetBucketVersioning
+              - s3:GetLifecycleConfiguration
+              - s3:GetEncryptionConfiguration
+              - s3:ListAllMyBuckets
+              - s3:ListBucketMultipartUploads
+              - s3:ListMultipartUploadParts
+            Resource: "*"
+          - Effect: Allow
+            Action:
+              - cloudwatch:ListMetrics
+              - cloudwatch:GetMetricStatistics
+              - cloudwatch:GetMetricData
+              - logs:DescribeLogGroups
+              - logs:GetQueryResults
+            Resource: "*"
+          - Effect: Allow
+            Action:
+              - logs:CreateExportTask
+              - logs:StartQuery
+            Resource:
+              - arn:aws:logs:*:*:log-group:/aws/containerinsights/*/performance
+              - arn:aws:logs:*:*:log-group:/aws/containerinsights/*/performance:*
+              - arn:aws:logs:*:*:log-group:/aws/containerinsights/*/performance:*:*
+          - Effect: Allow
+            Action:
+              - autoscaling:Describe*
+            Resource: "*"
+          - Effect: Allow
+            Action:
+              - eks:ListFargateProfiles
+              - eks:DescribeNodegroup
+              - eks:ListNodegroups
+              - eks:DescribeFargateProfile
+              - eks:ListTagsForResource
+              - eks:ListUpdates
+              - eks:DescribeUpdate
+              - eks:DescribeCluster
+              - eks:ListClusters
+            Resource: "*"
+          - Effect: Allow
+            Action:
+              - dynamodb:Describe*
+              - dynamodb:List*
+              - tag:GetResources
+              - rds:DescribeDBInstances
+              - rds:DescribeDBClusters
+              - rds:ListTagsForResource
+              - ecs:DescribeClusters
+              - redshift:DescribeClusters
+              - es:ListDomainNames
+              - es:DescribeElasticsearchDomains
+              - elasticache:DescribeCacheClusters
+              - kinesis:ListStreams
+              - kinesis:DescribeStream
+              - kms:ListKeys
+              - kms:DescribeKey
+              - kms:ListResourceTags
+              - cloudTrail:DescribeTrails
+            Resource: "*"
+          - Effect: Allow
+            Action:
+              #- aws-portal:ViewBilling < Deprecated
+              - account:GetAccountInformation
+              - billing:GetBillingData
+              - billing:GetBillingDetails
+              - billing:GetBillingNotifications
+              - billing:GetBillingPreferences
+              - billing:GetContractInformation
+              - billing:GetCredits
+              - billing:GetIAMAccessPreference
+              - billing:GetSellerOfRecord
+              - billing:ListBillingViews
+              - ce:DescribeNotificationSubscription
+              - ce:DescribeReport
+              - ce:GetAnomalies
+              - ce:GetAnomalyMonitors
+              - ce:GetAnomalySubscriptions
+              - ce:GetCostAndUsage
+              - ce:GetCostAndUsageWithResources
+              - ce:GetCostCategories
+              - ce:GetCostForecast
+              - ce:GetDimensionValues
+              - ce:GetPreferences
+              - ce:GetReservationCoverage
+              - ce:GetReservationPurchaseRecommendation
+              - ce:GetReservationUtilization
+              - ce:GetRightsizingRecommendation
+              - ce:GetSavingsPlansPurchaseRecommendation
+              - ce:GetSavingsPlansUtilization
+              - ce:GetSavingsPlansUtilizationDetails
+              - ce:GetSavingsPlansCoverage
+              - ce:GetTags
+              - ce:GetUsageForecast
+              - ce:ListCostAllocationTags
+              - ce:ListSavingsPlansPurchaseRecommendationGeneration
+              - consolidatedbilling:GetAccountBillingRole
+              - consolidatedbilling:ListLinkedAccounts
+              - cur:GetClassicReport
+              - cur:DescribeReportDefinitions
+              - cur:GetUsageReport
+              - cur:GetClassicReportPreferences
+              - cur:ValidateReportDestination
+              - freetier:GetFreeTierAlertPreference
+              - freetier:GetFreeTierUsage
+              - invoicing:GetInvoiceEmailDeliveryPreferences
+              - invoicing:GetInvoicePDF
+              - invoicing:ListInvoiceSummaries
+              - payments:GetPaymentInstrument
+              - payments:GetPaymentStatus
+              - payments:ListPaymentPreferences
+              - tax:GetTaxInheritance
+              - tax:GetTaxRegistrationDocument
+              - tax:ListTaxRegistrations
+            Resource: "*"
+          - Effect: Allow
+            Action:
+              - logs:DescribeExportTasks
+            Resource: "*"
+          - Effect: Allow
+            Action:
+              - s3:Put*
+            Resource: arn:aws:s3:::prod-k8s-cloudwatch-logs-*
+        Version: '2012-10-17'
+    Type: AWS::IAM::ManagedPolicy
+  AnodotRole:
+    Properties:
+      RoleName: "PileusRole"
+      AssumeRolePolicyDocument:
+        Statement:
+          - Action: sts:AssumeRole
+            Condition:
+              StringEquals:
+                sts:ExternalId: !Ref 'ExternalId'
+            Effect: Allow
+            Principal:
+              AWS: arn:aws:iam::932213950603:root
+        Version: '2012-10-17'
+      ManagedPolicyArns:
+        - !Ref 'AnodotManagedPolicy'
+    Type: AWS::IAM::Role
+
+  AnodotNotificationLambda:
+    Type: AWS::Lambda::Function
+    DependsOn: S3AnodotBucket
+    Properties:
+      Environment:
+        Variables:
+          ACC_ID: !Ref 'AWS::AccountId'
+          FunctionName: OnboardingAnodotNotificationLambda
+          CUR_BUCKET_NAME: !Ref 'CURbucketName'
+      Code:
+        ZipFile: |
+          import boto3
+          from pprint import pprint
+          import pathlib
+          import os
+          import cfnresponse
+
+          def main(event, context):
+              
+          ########create file########
+              ACC_ID = os.environ.get('ACC_ID')
+              CUR_BUCKET_NAME = os.environ.get('CUR_BUCKET_NAME')
+              file_path = ('/tmp/'+ACC_ID+'_connect_to_pileus.txt')
+              file = open(file_path, 'w')
+              file.write('[DEFAULT]\n')
+              file.write('    aws_account_id = '+ACC_ID+'\n')
+              file.write('    s3_invoice_bucket = '+CUR_BUCKET_NAME+'\n')
+              file.write('    pileus_role_arn = arn:aws:iam::'+ACC_ID+':role/PileusRole\n    ')
+              file.close()
+          ########upload file########
+              s3 = boto3.client("s3")
+              bucket_name = CUR_BUCKET_NAME
+              object_name = ACC_ID+"_connect_to_pileus.txt"
+              file_name = os.path.join('/tmp', ACC_ID+'_connect_to_pileus.txt')
+              response = s3.upload_file(file_name, bucket_name, object_name)
+              pprint(response)  # prints None
+          ########return status to cloudformation stack########
+              result = cfnresponse.SUCCESS
+              cfnresponse.send(event, context, result, {})
+              delete_lambda_function()
+          def delete_lambda_function():
+            function_name = os.environ['FunctionName']
+            client = boto3.client('lambda')
+            client.delete_function(FunctionName=function_name)
+
+      FunctionName: OnboardingAnodotNotificationLambda
+      Handler: index.main
+      Role: !GetAtt
+        - OnboardingAnodotNotificationLambdaRole
+        - Arn
+      Runtime: python3.9
+      Timeout: 120
+  OnboardingAnodotNotificationLambdaRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: OnboardingAnodotNotificationLambdaRole
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+        - Effect: Allow
+          Principal:
+            Service:
+              - lambda.amazonaws.com
+          Action:
+            - sts:AssumeRole
+      Path: /
+      Policies:
+        - PolicyName: OnboardingAnodotNotificationLambdaPolicy
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Sid: "BasicExecution"
+                Effect: Allow
+                Action: 
+                  - 'logs:CreateLogGroup'
+                Resource: !Join [':',['arn:aws:logs',!Ref 'AWS::Region', !Ref 'AWS::AccountId','*']]
+              - Sid: "PutLogEvents"
+                Effect: Allow
+                Action: 
+                  - 'logs:CreateLogStream'
+                  - 'logs:PutLogEvents'  
+                Resource: !Join ['',['arn:aws:logs:','*:',!Ref 'AWS::AccountId',':log-group:/aws/lambda/', 'AnodotNotificationLambdaUpdate', ':*' ]]
+              - Sid: "AnodotNotificationLambda"
+                Effect: Allow
+                Action: 
+                  - s3:PutObject
+                  - s3:GetObject
+                Resource: !Join ['',['arn:aws:s3:::',!Ref 'CURbucketName','/*']]
+              - Sid: "DeleteLambda"
+                Effect: Allow
+                Action: 
+                  - 'lambda:DeleteFunction'
+                Resource: !Join ['',['arn:aws:lambda:','us-east-1:',!Ref 'AWS::AccountId',':function',':OnboardingAnodotNotificationLambda']]
+
+
+  RunNotificationLambda:
+    Type: Custom::LambdaRun
+    DependsOn: AnodotNotificationLambda
+    Properties:
+      ServiceToken: !GetAtt AnodotNotificationLambda.Arn
+
+  CostUsageReportDefinitionAnodot:
+    Type: AWS::CUR::ReportDefinition
+    Condition: CondCUR
+    DependsOn: RunNotificationLambda
+    Properties:
+      AdditionalSchemaElements:
+        - "RESOURCES"
+      Compression: "GZIP"
+      Format: "textORcsv"
+      ReportName: !Ref 'CURbucketName'
+      ReportVersioning: "CREATE_NEW_REPORT"
+      RefreshClosedReports: True
+      S3Bucket: !Ref 'S3AnodotBucket'
+      S3Prefix: "hourly"
+      S3Region: "us-east-1"
+      TimeUnit: "HOURLY"
